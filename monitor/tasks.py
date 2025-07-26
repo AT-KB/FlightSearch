@@ -4,15 +4,14 @@ from datetime import date, timedelta
 from .models import Route, PriceHistory
 import os
 
-# Amadeus クライアントを環境変数から初期化
-amadeus = Client(
-    client_id=os.getenv("AMADEUS_CLIENT_ID"),
-    client_secret=os.getenv("AMADEUS_CLIENT_SECRET"),
-)
-
 @shared_task
 def monitor_prices():
-    """各ルートの最安価格を取得して保存するタスク"""
+    """Monitor flight prices for all routes and save the lowest price to history."""
+    amadeus = Client(
+        client_id=os.getenv('AMADEUS_CLIENT_ID'),
+        client_secret=os.getenv('AMADEUS_CLIENT_SECRET')
+    )
+
     routes = Route.objects.all()
     for route in routes:
         try:
@@ -20,16 +19,19 @@ def monitor_prices():
                 originLocationCode=route.origin,
                 destinationLocationCode=route.destination,
                 airlineCodes=route.airline,
-                departureDate=(date.today() + timedelta(days=30)).strftime("%Y-%m-%d"),
+                departureDate=(date.today() + timedelta(days=30)).strftime('%Y-%m-%d'),
                 adults=1,
-                currencyCode="JPY",
+                currencyCode='JPY'
             )
-            offers = response.data or []
-            prices = [float(o["price"]["total"]) for o in offers]
-            if prices:
+            offers = response.data
+            if offers:
+                prices = [float(offer['price']['total']) for offer in offers]
                 min_price = min(prices)
-                PriceHistory.objects.create(route=route, price=min_price)
+            else:
+                min_price = None
         except ResponseError as error:
-            # エラー発生時は次のルートへ
-            print(error)
-            continue
+            print(f"Amadeus API error for route {route}: {error}")
+            continue  # 次ルートへ
+
+        if min_price is not None:
+            PriceHistory.objects.create(route=route, price=min_price)
