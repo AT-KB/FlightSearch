@@ -11,7 +11,12 @@ def send_alert(route, price):
     """Send an email alert for an error fare."""
     message = f"Error fare for {route}: {price}"
     from_email = settings.EMAIL_HOST_USER or "noreply@example.com"
-    send_mail("Error Fare Detected", message, from_email, [route.user.email])
+    recipient = [route.user.email] if route.user.email else []
+    if recipient:
+        send_mail("Error Fare Detected", message, from_email, recipient)
+    else:
+        print("No email for user, skipping alert.")
+
 
 @shared_task
 def monitor_prices():
