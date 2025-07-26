@@ -6,3 +6,4 @@ amadeus
 python-dotenv
 psycopg2-binary
 dj-database-url
+gunicorn==20.1.0
