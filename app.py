@@ -5,6 +5,7 @@ from calc_utils import calculate_miles, calculate_lsp, calculate_lsp_unit_price,
 
 st.title("JAL国際線 LSP検索ツール")
 
+# 入力フォーム
 origin = st.text_input("出発地 (例: NRT)", "NRT")
 destinations_str = st.text_input("到着地 (カンマ区切り, 例: JFK,LHR,SYD)", "JFK")
 destinations = [d.strip() for d in destinations_str.split(",") if d.strip()]
@@ -17,12 +18,14 @@ if st.button("検索開始"):
     client = get_amadeus_client()
     results = []
 
+    # 最安日取得 (destごとに並行はせず、シンプルにループ)
     dep_dates = {}
     for dest in destinations:
         cheapest = search_cheapest_dates(client, origin, dest, departure_range)
         if cheapest and cheapest.data:
-            dep_dates[dest] = cheapest.data[0]['departureDate']
+            dep_dates[dest] = cheapest.data[0]['departureDate']  # 最安日
 
+    # 並行検索 (dest & class)
     for dest in destinations:
         dep_date = dep_dates.get(dest)
         if dep_date:
@@ -33,7 +36,7 @@ if st.button("検索開始"):
                     lsp = calculate_lsp(miles)
                     price = float(offer['price']['total'])
                     unit_price = calculate_lsp_unit_price(price, lsp)
-                    if min_unit_price == 0.0 or unit_price <= min_unit_price:
+                    if min_unit_price == 0.0 or unit_price <= min_unit_price:  # 修正: <= で安いもののみ
                         results.append({
                             '出発地': origin,
                             '到着地': dest,
@@ -47,8 +50,10 @@ if st.button("検索開始"):
 
     if results:
         df = pd.DataFrame(results)
-        df = df.sort_values(by='LSP単価')
-        st.dataframe(df)
+        df = df.sort_values(by='LSP単価')  # 安い順ソート
+        st.dataframe(df)  # テーブル表示
+
+        # CSV出力
         csv = df.to_csv(index=False).encode('utf-8')
         st.download_button(label="CSVダウンロード", data=csv, file_name="jal_lsp_results.csv", mime='text/csv')
     else:
